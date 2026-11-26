@@ -1,0 +1,12 @@
+name = "tim-gau-server"
+main = "worker.js"
+compatibility_date = "2025-06-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# Durable Object dùng SQLite => chạy được trên gói Cloudflare Workers miễn phí.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+.dev.vars
+.DS_Store
+# Sinh tự động bởi scripts/gen-manifest.mjs (ảnh gốc nằm ở bubu/ và dudu/)
+public/assets/bubu/
+public/assets/dudu/
+public/assets/manifest.json

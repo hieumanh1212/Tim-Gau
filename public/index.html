@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="description" content="Tìm Bubu & Dudu – game tìm hình gấu trắng và gấu nâu, chơi một mình hoặc online 2 người.">
+  <title>Tìm Bubu &amp; Dudu</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- MENU -->
+  <section id="menu" class="screen active">
+    <div class="card">
+      <h1>Tìm <span class="bubu">Bubu</span> &amp; <span class="dudu">Dudu</span></h1>
+      <div class="refs">
+        <figure><canvas class="portrait" data-target="bubu" width="160" height="160"></canvas><figcaption>Bubu – gấu trắng</figcaption></figure>
+        <figure><canvas class="portrait" data-target="dudu" width="160" height="160"></canvas><figcaption>Dudu – gấu nâu</figcaption></figure>
+      </div>
+      <p class="rule">Chạm vào Bubu và Dudu giữa hàng trăm bạn thú. Mỗi màn chỉ có <b>đúng 1 Bubu và 1 Dudu</b> – ai tìm ra trước nào!</p>
+
+      <label>Tên của bạn
+        <input id="name" maxlength="16" placeholder="Gấu con" autocomplete="nickname">
+      </label>
+
+      <div class="levels">
+        <button class="lv" data-level="easy">Dễ<small>500 bạn thú</small></button>
+        <button class="lv" data-level="medium">Vừa<small>1000 bạn thú</small></button>
+        <button class="lv" data-level="hard">Khó<small>3000 bạn thú</small></button>
+      </div>
+      <p class="pick-title">Bối cảnh</p>
+      <div class="themes"></div>
+      <button id="btn-solo" class="primary wide">Chơi một mình</button>
+
+      <div class="online">
+        <h2>Chơi online 2 người</h2>
+        <button id="btn-create" class="wide">Tạo phòng mới</button>
+        <div class="join">
+          <input id="room-code" placeholder="Mã phòng" maxlength="8" autocomplete="off">
+          <button id="btn-join">Vào phòng</button>
+        </div>
+        <p id="online-note" class="note"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHÒNG CHỜ -->
+  <section id="lobby" class="screen">
+    <div class="card">
+      <h2>Phòng <span id="lobby-code"></span></h2>
+      <button id="btn-copy" class="wide">📋 Sao chép link mời</button>
+      <ul id="lobby-players"></ul>
+      <p id="lobby-status" class="rule"></p>
+      <div id="lobby-levels">
+        <div class="levels">
+          <button class="lv" data-level="easy">Dễ<small>500</small></button>
+          <button class="lv" data-level="medium">Vừa<small>1000</small></button>
+          <button class="lv" data-level="hard">Khó<small>3000</small></button>
+        </div>
+        <p class="pick-title">Bối cảnh</p>
+        <div class="themes"></div>
+      </div>
+      <div class="row">
+        <button id="btn-leave">Rời phòng</button>
+        <button id="btn-start" class="primary">Bắt đầu</button>
+      </div>
+      <p class="note muted">5 ván – ai tìm thấy Bubu/Dudu trước được +1 điểm.</p>
+    </div>
+  </section>
+
+  <!-- MÀN CHƠI -->
+  <section id="game" class="screen">
+    <header class="hud">
+      <button id="btn-quit" class="icon" title="Thoát">✕</button>
+      <div class="targets">
+        <div class="tcard" data-target="bubu"><canvas class="portrait" data-target="bubu" width="80" height="80"></canvas><span>Bubu</span></div>
+        <div class="tcard" data-target="dudu"><canvas class="portrait" data-target="dudu" width="80" height="80"></canvas><span>Dudu</span></div>
+      </div>
+      <div id="hud-scores"></div>
+      <div id="hud-info"><span id="hud-time">00:00</span><span id="hud-round"></span></div>
+      <button id="btn-hint" class="icon" title="Gợi ý (+10 giây)">💡</button>
+    </header>
+    <canvas id="board"></canvas>
+    <div class="zoom">
+      <button id="zoom-in" title="Phóng to">+</button>
+      <button id="zoom-out" title="Thu nhỏ">−</button>
+      <button id="zoom-fit" title="Xem toàn cảnh">⤢</button>
+    </div>
+  </section>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <div id="modal" class="modal hidden">
+    <div class="card">
+      <h2 id="modal-title"></h2>
+      <p id="modal-text"></p>
+      <div id="modal-actions"></div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
