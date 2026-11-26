@@ -296,7 +296,16 @@ function onTap(wx, wy) {
     onMiss(wx, wy, hit);
     return;
   }
-  if (!state.found[hit.target]) onCorrect(hit.target);
+  if (state.found[hit.target]) onAlreadyFound(hit);
+  else onCorrect(hit.target);
+}
+
+// Bấm vào Bubu/Dudu đã bị tìm thấy: không tính điểm, chỉ báo cho người chơi biết.
+function onAlreadyFound(c) {
+  const byOpp = state.found[c.target] === 'opp';
+  const text = byOpp ? 'Bạn kia tìm ra tớ trước rồi! 😝' : 'Cậu tìm ra tớ rồi mà~';
+  state.effects.push(bubbleEffect(c, text, Date.now()));
+  view.requestDraw();
 }
 
 // Bấm nhầm: bạn thú bị bấm sẽ "cãi" bằng bong bóng thoại; bấm vào chỗ trống thì hiện thông báo.
