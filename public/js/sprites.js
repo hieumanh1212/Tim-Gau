@@ -3,6 +3,9 @@
 const MAX_SIDE = 320;
 const ALPHA_MIN = 24;
 const BG_TOLERANCE = 60;
+const MIN_CLEAR_BORDER = 0.85; // ít nhất 85% mép ảnh phải xoá được nền thì mới dùng ảnh
+const INNER_RING = 0.06; // vòng kiểm tra thứ 2: lùi vào 6% kích thước ảnh
+const MIN_CLEAR_INNER = 0.45; // ...và ít nhất 45% vòng đó phải trong suốt (nhân vật có thể chạm vòng này)
 const EMPTY = { bubu: [], dudu: [] };
 
 function makeCanvas(w, h) {
@@ -36,10 +39,11 @@ function colorDist(d, i, ref) {
   return Math.abs(d[p] - ref[0]) + Math.abs(d[p + 1] - ref[1]) + Math.abs(d[p + 2] - ref[2]);
 }
 
-// Màu nền = màu của 1 góc mà ít nhất 3/4 góc giống nó. Ảnh đã trong suốt hoặc nền nhiều màu => null.
+const cornerIndexes = (w, h) => [0, w - 1, (h - 1) * w, h * w - 1];
+
+// Màu nền = màu của 1 góc mà ít nhất 3/4 góc giống nó. Nền nhiều màu (cảnh vật) => null.
 function backgroundColor(d, w, h) {
-  const corners = [0, w - 1, (h - 1) * w, h * w - 1];
-  if (corners.some((i) => d[i * 4 + 3] < 250)) return null;
+  const corners = cornerIndexes(w, h);
   for (const c of corners) {
     const ref = [d[c * 4], d[c * 4 + 1], d[c * 4 + 2]];
     const similar = corners.filter((i) => colorDist(d, i, ref) < BG_TOLERANCE).length;
@@ -63,10 +67,30 @@ function pushNeighbors(stack, i, w, h) {
   if (i < w * (h - 1)) stack.push(i + w);
 }
 
-// Loang từ mép ảnh vào, xoá các điểm gần màu nền. Nhân vật có viền đậm nên phần thân trắng không bị ăn mất.
-function removeBackground(d, w, h) {
+// Xử lý nền ảnh. Trả về false nếu ảnh không dùng được (nền là cảnh vật nhiều màu, không xoá sạch được):
+// ảnh như vậy sẽ hiện thành ô vuông giữa bãi cỏ => nhìn là thấy ngay, nên bỏ qua.
+export function removeBackground(d, w, h) {
+  if (cornerIndexes(w, h).some((i) => d[i * 4 + 3] < 250)) return true; // PNG đã trong suốt sẵn
   const ref = backgroundColor(d, w, h);
-  if (!ref) return;
+  if (!ref) return false;
+  floodBackground(d, w, h, ref);
+  const inset = Math.round(Math.min(w, h) * INNER_RING);
+  return ringClearRatio(d, w, h, 0) >= MIN_CLEAR_BORDER && ringClearRatio(d, w, h, inset) >= MIN_CLEAR_INNER;
+}
+
+// Tỉ lệ điểm đã thành trong suốt trên khung chữ nhật lùi vào `inset` px so với mép ảnh.
+// Mép ngoài sạch nhưng vòng bên trong không sạch => ảnh có khung nền thứ 2 (VD viền trắng bọc nền xanh).
+function ringClearRatio(d, w, h, inset) {
+  const ring = borderIndexes(w - inset * 2, h - inset * 2).map((i) => {
+    const rw = w - inset * 2;
+    return (Math.floor(i / rw) + inset) * w + (i % rw) + inset;
+  });
+  const clear = ring.filter((i) => d[i * 4 + 3] === 0).length;
+  return clear / ring.length;
+}
+
+// Loang từ mép ảnh vào, xoá các điểm gần màu nền. Nhân vật có viền đậm nên phần thân trắng không bị ăn mất.
+function floodBackground(d, w, h, ref) {
   const seen = new Uint8Array(w * h);
   const stack = borderIndexes(w, h);
   while (stack.length) {
@@ -118,7 +142,10 @@ async function loadSprite(url, id) {
   fctx.drawImage(img, 0, 0, w, h);
   const imageData = fctx.getImageData(0, 0, w, h);
   const data = imageData.data;
-  removeBackground(data, w, h);
+  if (!removeBackground(data, w, h)) {
+    console.info('Bỏ qua ảnh vì không xoá được nền:', url);
+    return null;
+  }
   fctx.putImageData(imageData, 0, 0);
   const box = opaqueBox(data, w, h);
   const canvas = makeCanvas(box.w, box.h);

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const assets = join(root, 'public', 'assets');
-const IMAGE_EXT = /\.(png|webp|gif|jpe?g)$/i;
+const IMAGE_EXT = /\.(png|webp|gif|jpe?g|avif)$/i;
 const byName = (a, b) => a.localeCompare(b, 'en', { numeric: true });
 
 function syncFolder(folder) {
