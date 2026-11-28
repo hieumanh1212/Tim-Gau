@@ -2,6 +2,9 @@
 const MIN_ZOOM_RANGE = 4; // luôn zoom được ít nhất 4 lần so với toàn cảnh
 const MAX_ABS_SCALE = 3; // ...và tối thiểu tới mức nhân vật hiện to gấp 3 kích thước gốc
 const TAP_SLOP = 8;
+const FRICTION = 0.92; // quán tính khi vuốt: tốc độ còn lại sau mỗi ~16ms
+const MIN_GLIDE_SPEED = 0.03; // px/ms – chậm hơn thì dừng
+const GLIDE_WINDOW = 80; // ms – nhấc tay trong khoảng này sau lần di chuyển cuối thì mới trượt tiếp
 
 function clampAxis(offset, size, view) {
   if (size <= view) return (view - size) / 2;
@@ -30,6 +33,11 @@ export class Viewport {
     this.moved = false;
     this.downAt = null;
     this.lastPinch = 0;
+    this.pinched = false;
+    this.vx = 0;
+    this.vy = 0;
+    this.lastMoveT = 0;
+    this.glideId = 0;
     this.bind();
   }
 
@@ -59,6 +67,7 @@ export class Viewport {
   }
 
   setWorld(w, h) {
+    this.stopGlide();
     this.world = { w, h };
     this.resize();
     this.fit();
@@ -115,13 +124,17 @@ export class Viewport {
 
   down(e) {
     this.canvas.setPointerCapture(e.pointerId);
+    this.stopGlide();
     const p = this.local(e);
     this.pointers.set(e.pointerId, p);
     if (this.pointers.size === 1) {
       this.downAt = p;
       this.moved = false;
+      this.pinched = false;
+      this.lastMoveT = performance.now();
     } else {
       this.moved = true;
+      this.pinched = true;
       this.lastPinch = 0;
     }
   }
@@ -135,8 +148,41 @@ export class Viewport {
       this.pinch();
       return;
     }
+    this.trackVelocity(p.x - prev.x, p.y - prev.y);
     this.pan(p.x - prev.x, p.y - prev.y);
     if (Math.hypot(p.x - this.downAt.x, p.y - this.downAt.y) > TAP_SLOP) this.moved = true;
+  }
+
+  trackVelocity(dx, dy) {
+    const now = performance.now();
+    const dt = Math.max(1, now - this.lastMoveT);
+    this.vx = dx / dt;
+    this.vy = dy / dt;
+    this.lastMoveT = now;
+  }
+
+  shouldGlide() {
+    return this.pointers.size === 0 && !this.pinched && performance.now() - this.lastMoveT < GLIDE_WINDOW;
+  }
+
+  // Vuốt rồi thả tay: bản đồ trượt tiếp và chậm dần (giống cuộn trang trên điện thoại).
+  glide() {
+    let last = performance.now();
+    const step = (now) => {
+      const dt = now - last;
+      last = now;
+      this.pan(this.vx * dt, this.vy * dt);
+      const f = FRICTION ** (dt / 16);
+      this.vx *= f;
+      this.vy *= f;
+      this.glideId = Math.hypot(this.vx, this.vy) > MIN_GLIDE_SPEED ? requestAnimationFrame(step) : 0;
+    };
+    this.glideId = requestAnimationFrame(step);
+  }
+
+  stopGlide() {
+    cancelAnimationFrame(this.glideId);
+    this.glideId = 0;
   }
 
   pinch() {
@@ -159,9 +205,12 @@ export class Viewport {
     const isTap = this.pointers.size === 1 && !this.moved;
     this.pointers.delete(e.pointerId);
     this.lastPinch = 0;
-    if (!isTap) return;
-    const w = this.toWorld(p.x, p.y);
-    this.onTap(w.x, w.y);
+    if (isTap) {
+      const w = this.toWorld(p.x, p.y);
+      this.onTap(w.x, w.y);
+      return;
+    }
+    if (this.shouldGlide()) this.glide();
   }
 
   cancel(e) {

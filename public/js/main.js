@@ -1,7 +1,8 @@
-import { buildScene, hitTest, LEVELS } from './scene.js';
+import { buildScene, hitTest, findTargetNear, LEVELS } from './scene.js';
 import { TARGET_SPECS } from './characters.js';
 import { drawScene, createSceneCache, drawRing, drawCross, drawHint, drawPortrait, markerOf, drawBubble, drawConfetti } from './render.js';
-import { randomOf, missLine, EMPTY_LINES, FOUND_LINES, OPP_FOUND_LINES, START_LINES, WIN_TITLES, PARTY } from './quips.js';
+import { randomOf, missLine, EMPTY_LINES, FOUND_LINES, OPP_FOUND_LINES, START_LINES, WIN_TITLES, PARTY, roundSummary, gameOverSummary } from './quips.js';
+import { targetsArt, scoreArt, withFooter } from './results.js';
 import { Viewport } from './view.js';
 import { Net } from './net.js';
 import { randomSeed } from './rng.js';
@@ -15,6 +16,8 @@ const NAMES = { bubu: 'Bubu', dudu: 'Dudu' };
 const COLORS = { me: '#16a34a', opp: '#f97316' };
 const HINT_PENALTY = 10000;
 const MISS_LOCK = 800;
+const TOUCH_SLOP = 14; // px màn hình: chạm lệch trong khoảng này quanh Bubu/Dudu vẫn tính là trúng
+const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 const state = {
@@ -121,10 +124,13 @@ function makeAction(action) {
   return btn;
 }
 
-function showModal(title, text, actions) {
+// art: phần hình minh hoạ (ảnh Bubu/Dudu, bảng điểm...) hiện giữa tiêu đề và lời nhắn.
+function showModal(title, text, actions, art = null) {
   $('#modal-title').textContent = title;
+  $('#modal-art').replaceChildren(...(art ? [art] : []));
   $('#modal-text').textContent = text;
   $('#modal-actions').replaceChildren(...actions.map(makeAction));
+  $('#modal-actions').hidden = actions.length === 0;
   $('#modal').classList.remove('hidden');
 }
 
@@ -291,13 +297,22 @@ function confettiEffect(x, y, now) {
 function onTap(wx, wy) {
   const blocked = !state.scene || allFound() || Date.now() < state.lockUntil;
   if (blocked) return;
-  const hit = hitTest(state.scene, wx, wy);
-  if (!hit?.target) {
+  const { hit, target } = pickTapTarget(wx, wy);
+  if (!target) {
     onMiss(wx, wy, hit);
     return;
   }
-  if (state.found[hit.target]) onAlreadyFound(hit);
-  else onCorrect(hit.target);
+  if (state.found[target.target]) onAlreadyFound(target);
+  else onCorrect(target.target);
+}
+
+// Chạm trúng Bubu/Dudu, hoặc chạm lệch tối đa ~TOUCH_SLOP px quanh một Bubu/Dudu chưa bị tìm thấy.
+function pickTapTarget(wx, wy) {
+  const hit = hitTest(state.scene, wx, wy);
+  if (hit?.target) return { hit, target: hit };
+  const near = findTargetNear(state.scene, wx, wy, TOUCH_SLOP / view.scale);
+  const usable = near && !state.found[near.target];
+  return { hit, target: usable ? near : null };
 }
 
 // Bấm vào Bubu/Dudu đã bị tìm thấy: không tính điểm, chỉ báo cho người chơi biết.
@@ -340,15 +355,16 @@ function markFound(target, who) {
     confettiEffect(m.x, m.y, now),
     bubbleEffect(c, line, now),
   );
+  if (who === 'me') navigator.vibrate?.([30, 40, 30]);
   updateTargetCards();
   view.requestDraw();
 }
 
 // ---------- Chơi một mình ----------
-async function startScene(seed, level, theme) {
+async function startScene(seed, level, theme, shape) {
   await spritesReady;
   await document.fonts?.ready; // để chữ trên biển hiệu vẽ đúng font
-  state.scene = buildScene(seed, level, state.sprites, theme);
+  state.scene = buildScene(seed, level, state.sprites, theme, shape);
   state.cache = createSceneCache(state.scene);
   drawRoundPortraits();
   state.found = { bubu: null, dudu: null };
@@ -368,8 +384,18 @@ async function startScene(seed, level, theme) {
 async function startSolo() {
   state.mode = 'solo';
   showScreen('game');
-  await startScene(randomSeed(), state.level, state.theme);
+  await startScene(randomSeed(), state.level, state.theme, deviceShape());
   toast(`${themeLabel()} – ${randomOf(START_LINES)}`, 2200);
+  maybeShowTouchTip();
+}
+
+// Chơi một mình: bản đồ theo hướng cầm máy. Chơi online luôn dùng bản đồ dọc để 2 máy giống nhau.
+const deviceShape = () => (window.innerHeight >= window.innerWidth ? 'portrait' : 'landscape');
+
+function maybeShowTouchTip() {
+  if (!IS_TOUCH || load('tg-touch-tip', '')) return;
+  save('tg-touch-tip', '1');
+  setTimeout(() => toast('👆 Chụm 2 ngón để phóng to, kéo để di chuyển', 3500), 2400);
 }
 
 function finishSolo() {
@@ -386,8 +412,11 @@ function finishSolo() {
     { label: 'Chơi lại', primary: true, fn: startSolo },
     { label: 'Về menu', fn: goMenu },
   ];
-  setTimeout(() => showModal(randomOf(WIN_TITLES), `Thời gian: ${fmtTime(ms)}\n${record}`, actions), 1200);
+  const art = targetsArt(roundSpecs(), state.found);
+  setTimeout(() => showModal(randomOf(WIN_TITLES), `Thời gian: ${fmtTime(ms)}\n${record}`, actions, art), 1200);
 }
+
+const roundSpecs = () => ({ bubu: findTarget('bubu'), dudu: findTarget('dudu') });
 
 function useHint() {
   if (state.mode !== 'solo' || !state.scene || allFound()) return;
@@ -507,8 +536,21 @@ function renderLobby() {
   $('#lobby-levels').hidden = !isHost();
 }
 
-async function copyInvite() {
+// Điện thoại: mở menu chia sẻ (Zalo, Messenger...). Máy tính: sao chép link.
+async function shareInvite() {
   const link = `${location.origin}${location.pathname}?room=${state.room}`;
+  if (!navigator.share) {
+    await copyInvite(link);
+    return;
+  }
+  try {
+    await navigator.share({ title: 'Tìm Bubu & Dudu', text: `Vào phòng ${state.room} tìm gấu với tớ nhé! 🐻`, url: link });
+  } catch (err) {
+    if (err?.name !== 'AbortError') await copyInvite(link);
+  }
+}
+
+async function copyInvite(link) {
   try {
     await navigator.clipboard.writeText(link);
     toast('Đã sao chép link mời!');
@@ -538,13 +580,16 @@ async function onRound(m) {
   Object.assign(state, { mode: 'online', round: m.round, totalRounds: m.total, level: m.level });
   hideModal();
   showScreen('game');
-  await startScene(m.seed, m.level, m.theme);
+  await startScene(m.seed, m.level, m.theme, 'portrait');
   toast(`Ván ${m.round}/${m.total} · ${themeLabel()}`);
+  maybeShowTouchTip();
 }
 
 function nameOf(id) {
   return state.players.find((p) => p.id === id)?.name ?? 'Đối thủ';
 }
+
+const oppName = () => state.players.find((p) => p.id !== state.myId)?.name ?? 'Đối thủ';
 
 function onClaimed(m) {
   if (m.round !== state.round) return;
@@ -556,29 +601,30 @@ function onClaimed(m) {
   toast(mine ? `Bạn tìm thấy ${NAMES[m.target]}! +1` : `${nameOf(m.by)} tìm thấy ${NAMES[m.target]} trước!`);
 }
 
+// Hết ván (cả Bubu và Dudu đã có chủ): hiện thẻ kết quả – mỗi người 1 con, hay 1 người bắt trọn cả 2.
+// Ván cuối thì bỏ qua, vì bảng tổng kết cả trận sẽ hiện ngay sau đó.
 function onRoundEnd(m) {
   state.endTime = Date.now();
   stopTimer();
-  if (m.round < m.total) setTimeout(() => toast('Ván tiếp theo sắp bắt đầu…', 2000), 1500);
-}
-
-function resultTitle(ranked) {
-  const [a, b] = ranked;
-  if (!b || a.score === b.score) return 'Hoà rồi! 🤝';
-  return a.id === state.myId ? 'Bạn thắng! 🏆' : `${a.name} thắng!`;
+  if (m.round >= m.total) return;
+  const { title, text } = roundSummary(state.found, oppName());
+  const art = withFooter(targetsArt(roundSpecs(), state.found, { me: 'Bạn', opp: oppName() }), 'Ván sau sắp bắt đầu');
+  setTimeout(() => {
+    if (state.round === m.round) showModal(title, text, [], art);
+  }, 900);
 }
 
 function onGameOver(m) {
   state.players = m.players;
   renderScores();
   const ranked = [...m.players].sort((x, y) => y.score - x.score);
-  const text = ranked.map((p) => `${p.name}: ${p.score} điểm`).join('\n');
+  const { title, text } = gameOverSummary(ranked, state.myId, oppName());
   const actions = [
     { label: 'Về phòng chờ', fn: () => showScreen('lobby') },
     { label: 'Thoát phòng', fn: leaveRoom },
   ];
   if (isHost()) actions.unshift({ label: 'Chơi lại', primary: true, fn: startOnline });
-  setTimeout(() => showModal(resultTitle(ranked), text, actions), 900);
+  setTimeout(() => showModal(title, text, actions, scoreArt(ranked, state.myId)), 900);
 }
 
 function onAborted() {
@@ -596,7 +642,7 @@ function bindUi() {
   on('#btn-solo', startSolo);
   on('#btn-create', () => connectRoom(genCode()));
   on('#btn-join', joinRoom);
-  on('#btn-copy', copyInvite);
+  on('#btn-copy', shareInvite);
   on('#btn-start', startOnline);
   on('#btn-leave', leaveRoom);
   on('#btn-quit', quitGame);
@@ -607,6 +653,15 @@ function bindUi() {
   $('#room-code').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') joinRoom();
   });
+  blockBrowserGestures();
+}
+
+// Không cho Safari/Chrome tự zoom cả trang hay hiện menu nhấn giữ khi đang chơi.
+function blockBrowserGestures() {
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+    document.addEventListener(type, (e) => e.preventDefault());
+  }
+  $('#board').addEventListener('contextmenu', (e) => e.preventDefault());
 }
 
 // Nút chọn bối cảnh sinh từ danh sách THEMES (thêm bối cảnh mới là tự có nút).

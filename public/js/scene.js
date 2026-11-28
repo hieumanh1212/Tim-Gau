@@ -16,10 +16,12 @@ const CELL_H = 78;
 const LOOK_SALT = 0x5bd1e995;
 const PROP_FILL = 0.85; // dùng 85% số ô dư cho đồ vật, phần còn lại để trống cho thoáng
 const NO_SPRITES = { bubu: [], dudu: [] };
+// Tỉ lệ cột/hàng của lưới: 'portrait' => bản đồ dọc (hợp điện thoại), 'landscape' => bản đồ ngang.
+const SHAPE_RATIO = { portrait: 0.75, landscape: 1.7 };
 
 // Hai luồng ngẫu nhiên tách biệt: "layout" (vị trí, đồ vật) và "looks" (ngoại hình / ảnh).
 // Nhờ vậy vị trí Bubu/Dudu luôn giống nhau trên 2 máy kể cả khi số ảnh tải được khác nhau.
-export function buildScene(seed, levelKey, sprites = NO_SPRITES, themeKey = 'random') {
+export function buildScene(seed, levelKey, sprites = NO_SPRITES, themeKey = 'random', shape = 'portrait') {
   const level = LEVELS[levelKey] ? levelKey : 'easy';
   const cfg = LEVELS[level];
   const theme = THEMES[resolveTheme(themeKey, seed)];
@@ -27,7 +29,7 @@ export function buildScene(seed, levelKey, sprites = NO_SPRITES, themeKey = 'ran
   const looks = mulberry32(seed ^ LOOK_SALT);
 
   const totalCells = Math.ceil(cfg.count / (1 - theme.propShare));
-  const cols = Math.ceil(Math.sqrt(totalCells * 1.7));
+  const cols = Math.ceil(Math.sqrt(totalCells * (SHAPE_RATIO[shape] || SHAPE_RATIO.portrait)));
   const rows = Math.ceil(totalCells / cols);
   const grid = makeGrid(cols, rows, Math.floor((cols * rows - cfg.count) * PROP_FILL));
   const top = theme.topBand * CELL_H;
@@ -113,6 +115,18 @@ export function hitTest(scene, x, y) {
     const c = scene.chars[i];
     const near = Math.abs(x - c.x) <= c.s && Math.abs(y - c.y) <= c.s;
     if (near && hitChar(c, ...toLocal(c, x, y))) return c;
+  }
+  return null;
+}
+
+// Dò quanh điểm chạm (2 vòng, 8 hướng) xem có Bubu/Dudu nằm sát đó không – bù cho ngón tay chạm lệch.
+export function findTargetNear(scene, x, y, radius) {
+  for (const r of [radius * 0.5, radius]) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const hit = hitTest(scene, x + Math.cos(a) * r, y + Math.sin(a) * r);
+      if (hit?.target) return hit;
+    }
   }
   return null;
 }

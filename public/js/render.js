@@ -4,7 +4,9 @@ import { THEMES } from './themes/index.js';
 const TAU = Math.PI * 2;
 
 const CACHE_MAX_SIDE = 4096;
-const CACHE_MAX_PIXELS = 14_000_000; // dưới giới hạn canvas của Safari iOS (~16.7M pixel)
+// Điện thoại (màn hình cảm ứng) dùng ảnh đệm nhỏ hơn để không bị trình duyệt giết tab vì hết bộ nhớ.
+const IS_TOUCH = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+const CACHE_MAX_PIXELS = IS_TOUCH ? 9_000_000 : 14_000_000; // dưới giới hạn canvas của Safari iOS (~16.7M pixel)
 const CACHE_MAX_SCALE = 2;
 
 const inRect = (x, y, pad, r) => x + pad > r.x0 && x - pad < r.x1 && y + pad > r.y0 && y - pad < r.y1;

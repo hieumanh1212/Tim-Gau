@@ -2,10 +2,17 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="description" content="Tìm Bubu & Dudu – game tìm hình gấu trắng và gấu nâu, chơi một mình hoặc online 2 người.">
+  <meta name="theme-color" content="#ff8a5b">
+  <!-- "Thêm vào màn hình chính" => mở toàn màn hình như app -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tìm Gấu">
+  <link rel="manifest" href="manifest.webmanifest">
   <title>Tìm Bubu &amp; Dudu</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700&display=swap" rel="stylesheet">
@@ -51,7 +58,7 @@
   <section id="lobby" class="screen">
     <div class="card">
       <h2>Phòng <span id="lobby-code"></span></h2>
-      <button id="btn-copy" class="wide">📋 Sao chép link mời</button>
+      <button id="btn-copy" class="wide">📤 Gửi link mời</button>
       <ul id="lobby-players"></ul>
       <p id="lobby-status" class="rule"></p>
       <div id="lobby-levels">
@@ -96,6 +103,7 @@
   <div id="modal" class="modal hidden">
     <div class="card">
       <h2 id="modal-title"></h2>
+      <div id="modal-art"></div>
       <p id="modal-text"></p>
       <div id="modal-actions"></div>
     </div>

@@ -19,6 +19,9 @@ html, body {
   height: 100%;
   color: var(--ink);
   overflow: hidden;
+  overscroll-behavior: none; /* chặn kéo-xuống-để-tải-lại trên điện thoại */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -30,7 +33,11 @@ body {
 
 .screen { display: none; height: 100dvh; }
 .screen.active { display: flex; }
-#menu, #lobby { padding: 16px; overflow-y: auto; }
+#menu, #lobby {
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
 
 .card {
   background: var(--card);
@@ -59,6 +66,7 @@ label { display: block; font-weight: 700; margin-bottom: 12px; }
 input {
   width: 100%;
   font: inherit;
+  font-size: 16px; /* >= 16px để iPhone không tự zoom khi gõ */
   padding: 10px 14px;
   margin-top: 4px;
   border: 2px solid var(--line);
@@ -78,6 +86,7 @@ button {
   background: #f3e6d8;
   color: var(--ink);
   transition: transform 0.08s, background 0.15s;
+  touch-action: manipulation; /* bỏ độ trễ & zoom khi chạm đúp vào nút */
 }
 button:hover { background: #ecdccb; }
 button:active { transform: scale(0.96); }
@@ -115,7 +124,7 @@ button.primary:hover { background: #f97845; }
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 8px 10px;
+  padding: calc(8px + env(safe-area-inset-top)) calc(10px + env(safe-area-inset-right)) 8px calc(10px + env(safe-area-inset-left));
   background: var(--card);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
   z-index: 2;
@@ -162,14 +171,32 @@ button.primary:hover { background: #f97845; }
 #hud-time { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 #hud-round { font-size: 0.75rem; color: var(--muted); }
 
-#board { flex: 1; width: 100%; min-height: 0; display: block; touch-action: none; cursor: crosshair; background: #cfe8b8; }
+#board {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  background: #cfe8b8;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 
-.zoom { position: fixed; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.zoom {
+  position: fixed;
+  right: calc(12px + env(safe-area-inset-right));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .zoom button { width: 44px; height: 44px; padding: 0; font-size: 1.3rem; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
 
 #toast {
   position: fixed;
-  top: 76px;
+  top: calc(72px + env(safe-area-inset-top));
   left: 50%;
   transform: translate(-50%, -10px);
   max-width: 92vw;
@@ -201,3 +228,103 @@ button.primary:hover { background: #f97845; }
 .modal.hidden { display: none; }
 #modal-text { white-space: pre-line; text-align: center; font-size: 1.05rem; }
 #modal-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---- Điện thoại (màn hình hẹp): HUD gọn 1 dòng, thẻ Bubu/Dudu chỉ còn ảnh, nút zoom to hơn ---- */
+@media (max-width: 560px) {
+  .card { padding: 18px; border-radius: 20px; }
+  h1 { font-size: 1.8rem; }
+  .hud { flex-wrap: nowrap; gap: 6px; padding-bottom: 6px; }
+  .icon { width: 38px; height: 38px; flex: none; }
+  .tcard { padding: 2px; }
+  .tcard span { display: none; }
+  .tcard canvas { width: 46px; height: 46px; }
+  #hud-scores { flex-direction: column; flex-wrap: nowrap; gap: 2px; min-width: 0; }
+  .chip { font-size: 0.72rem; padding: 0 7px; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #hud-info { min-width: 0; }
+  #hud-time { font-size: 1.1rem; }
+  #hud-round { font-size: 0.66rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .zoom button { width: 50px; height: 50px; font-size: 1.5rem; }
+  #toast { font-size: 0.9rem; }
+}
+
+/* ---- Bảng thông báo cute: nảy bật ra, dấu chân & tim lơ lửng, ảnh lắc lư ---- */
+.modal .card {
+  position: relative;
+  text-align: center;
+  background: linear-gradient(180deg, #ffffff 0%, #fff6ec 100%);
+  border: 3px solid #ffd7c2;
+  animation: modal-pop 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+.modal .card::before,
+.modal .card::after {
+  position: absolute;
+  font-size: 1.9rem;
+  animation: modal-bob 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.modal .card::before { content: '🐾'; top: -18px; left: -10px; transform: rotate(-20deg); }
+.modal .card::after { content: '💕'; top: -16px; right: -8px; animation-delay: 0.6s; }
+#modal-title { color: #e8603c; font-size: 1.45rem; line-height: 1.2; margin-bottom: 8px; }
+#modal-text { margin: 10px 0 14px; }
+
+.res-row { display: flex; justify-content: center; gap: 14px; margin: 4px 0; }
+.res-tile {
+  width: 124px;
+  padding: 8px 6px 10px;
+  border-radius: 20px;
+  background: #fff3e8;
+  border: 3px solid #f3e6d8;
+  animation: tile-wiggle 1.8s ease-in-out infinite;
+}
+.res-tile:nth-child(2) { animation-delay: 0.45s; }
+.res-tile.me { border-color: var(--me); background: #ebfbec; }
+.res-tile.opp { border-color: var(--opp); background: #fff1e3; }
+.res-tile canvas { width: 92px; height: 92px; display: block; margin: 0 auto; }
+.res-tile b { display: block; font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-chip {
+  display: inline-block;
+  max-width: 100%;
+  margin-top: 4px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--me);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.res-tile.opp .res-chip { background: var(--opp); }
+.res-crown { font-size: 1.8rem; line-height: 1; }
+.res-score { font-size: 2.4rem; font-weight: 700; line-height: 1.1; color: var(--ink); }
+.res-next { margin: 10px 0 0; color: var(--muted); font-size: 0.85rem; }
+.res-next::after { content: ''; animation: dots 1.2s steps(4, end) infinite; }
+
+@keyframes modal-pop {
+  from { transform: scale(0.55) rotate(-5deg); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes modal-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -6px; }
+}
+@keyframes tile-wiggle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg) translateY(-4px); }
+}
+@keyframes dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
+@media (max-width: 380px) {
+  .res-tile { width: 108px; }
+  .res-tile canvas { width: 78px; height: 78px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal .card, .modal .card::before, .modal .card::after, .res-tile { animation: none; }
+}
